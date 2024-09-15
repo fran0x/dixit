@@ -1,0 +1,39 @@
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+keywords = ["dixit", "persist"]
+repository = "https://github.com/fran0x/dixit"
+authors = ["Francisco Lopez <flopezlasanta@gmail.com>"]
+license = "MIT"
+rust-version = "1.81.0"
+
+[workspace]
+members = [
+    "dixit",
+    "dixit_persist",
+    "dixit_persist_macros",
+]
+resolver = "2"
+
+[workspace.dependencies]
+dixit_persist = { path = "dixit_persist" }
+dixit_persist_macros = { path = "dixit_persist_macros" }
+
+anyhow = "1.0.89"
+chrono = { version = "0.4.38", features = ["serde"] }
+clap = { version = "4.5.17", features = ["derive"] }
+compact_str = { version = "0.8.0", features = ["serde"] }
+futures = "0.3.30"
+itertools = "0.13.0"
+parquet = { version = "53.0.0", features = ["zstd"] }
+rand = "0.8.5" # used for tests
+rust_decimal = { version = "1.36.0", features = ["serde"] }
+rustls = "0.23.13"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+serde_yaml = "0.9.34"
+thiserror = "1.0.63"
+tokio = { version = "1.40.0", features = ["full"] }
+tokio-tungstenite = { version = "0.24.0", features = ["rustls-tls-native-roots"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

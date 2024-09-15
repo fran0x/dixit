@@ -1,0 +1,25 @@
+[package]
+name = "dixit_persist"
+description = "dixit persist library"
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dixit_persist_macros.workspace = true
+
+anyhow.workspace = true
+chrono.workspace = true
+compact_str.workspace = true
+itertools.workspace = true
+parquet.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
