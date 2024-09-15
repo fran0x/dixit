@@ -1,0 +1,18 @@
+[package]
+name = "recorder-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+clap = { version = "4.5.17", features = ["derive"] }
+futures = "0.3.30"
+parquet = { version = "53.0.0", features = ["async"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+serde_yaml = "0.9.34"
+thiserror = "1.0.63"
+tokio = { version = "1.40.0", features = ["full"] }
+tokio-tungstenite = "0.24.0"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
