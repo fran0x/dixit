@@ -32,5 +32,5 @@ release:
     cargo build --all-targets --release
 
 # launch coinbase
-run-coinbase:
+coinbase:
     RUST_LOG=info cargo run -- -v coinbase

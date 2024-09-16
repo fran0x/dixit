@@ -72,28 +72,36 @@ mod model {
             exchange: String,
             channel: String,
             symbol: String,
-            data: Box<VenueData>,
+            data: VenueData,
         },
-        Skip,
+        Skip {
+            message: String,
+        },
+        Error {
+            message: String,
+            reason: String,
+        },
     }
 }
 
 mod persister {
     use tokio::sync::mpsc::Receiver;
-    use tracing::info;
+    use tracing::{error, info};
 
     use crate::model::{Record, VenueData};
 
     pub async fn run(mut rx: Receiver<Record>) {
         while let Some(record) = rx.recv().await {
-            info!("received data");
             match record {
-                Record::Data { data, .. } => match *data {
-                    VenueData::CoinbaseRfqMatch(_rfq_match) => {
-                        info!("received coinbase data");
-                    }
-                },
-                Record::Skip => {}
+                Record::Data {
+                    data: VenueData::CoinbaseRfqMatch(_),
+                    ..
+                } => info!("coinbase data"),
+                Record::Skip { message } => info!("skip data: {message}"),
+                Record::Error { message, reason } => {
+                    error!("{message}: {reason}");
+                    break;
+                }
             }
         }
     }
@@ -122,13 +130,13 @@ mod websocket {
         let mut stream = match connect(ws_url).await {
             Ok(s) => s,
             Err(e) => {
-                error!("Websocket connect error: {:?}", e);
+                error!("websocket connect error: {:?}", e);
                 return;
             }
         };
 
         if let Err(e) = stream.send(subscribe_fn()).await {
-            error!("Websocket send error: {:?}", e);
+            error!("websocket send error: {:?}", e);
             return;
         }
 
@@ -137,12 +145,12 @@ mod websocket {
                 Ok(message) => {
                     let record = handle_fn(message);
                     if let Err(e) = tx.send(record).await {
-                        error!("Channel send error: {:?}", e);
+                        error!("channel send error: {:?}", e);
                         return;
                     }
                 }
                 Err(e) => {
-                    error!("Websocket error: {:?}", e);
+                    error!("websocket error: {:?}", e);
                     break;
                 }
             }
@@ -178,16 +186,29 @@ mod coinbase {
 
     pub fn handle(message: Message) -> Record {
         match message {
-            Message::Text(string) => match from_str::<RfqMatch>(&string) {
-                Ok(rfq_match) if rfq_match.channel == "rfq_match" => Record::Data {
-                    exchange: EXCHANGE.to_string(),
-                    channel: rfq_match.channel.clone(),
-                    symbol: rfq_match.product_id.clone(),
-                    data: Box::new(VenueData::CoinbaseRfqMatch(rfq_match)),
-                },
-                _ => Record::Skip,
+            Message::Text(string) => {
+                if let Ok(rfq_match) = from_str::<RfqMatch>(&string) {
+                    if rfq_match.channel == "rfq_match" {
+                        return Record::Data {
+                            exchange: EXCHANGE.to_string(),
+                            channel: rfq_match.channel.clone(),
+                            symbol: rfq_match.product_id.clone(),
+                            data: VenueData::CoinbaseRfqMatch(rfq_match),
+                        };
+                    }
+                } else if let Ok(rfq_error) = from_str::<RfqError>(&string) {
+                    if rfq_error.channel == "error" {
+                        return Record::Error {
+                            message: rfq_error.message,
+                            reason: rfq_error.reason,
+                        };
+                    }
+                }
+                Record::Skip { message: string }
+            }
+            _ => Record::Skip {
+                message: "no text".to_owned(),
             },
-            _ => Record::Skip,
         }
     }
 
@@ -203,5 +224,13 @@ mod coinbase {
         pub size: Decimal,
         pub price: Decimal,
         pub side: String,
+    }
+
+    #[derive(Deserialize, Debug)]
+    pub struct RfqError {
+        #[serde(rename = "type")]
+        pub channel: String,
+        pub message: String,
+        pub reason: String,
     }
 }
