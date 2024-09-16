@@ -1,98 +1,163 @@
 use anyhow::Result;
-use futures::{SinkExt, StreamExt};
+use futures::future::join_all;
 use tokio::sync::mpsc;
-use tracing::error;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
 
-// extern crate parquet;
-// #[macro_use] extern crate parquet_derive;
-
-mod config;
-use config::Config;
+use config::{init, Venue};
+use model::Record;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // set tracing and load the configuration
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_line_number(true))
-        .with(EnvFilter::from_default_env())
-        .init();
-    let config = Config::read()?;
+    // initialize application settings and read command line arguments
+    let args = init();
 
     // create a channel to send data from the websocket to the persister
     let (tx, rx) = mpsc::channel::<Record>(100);
 
-    // spawn the persister
+    // launch the persister
     let persister = tokio::spawn(async move {
-        if let Err(e) = persister::handle(rx).await {
-            error!("Persister error: {:?}", e);
+        persister::run(rx).await;
+    });
+
+    // launch the websocket
+    let websocket = tokio::spawn(async move {
+        match args.venue {
+            Venue::Coinbase => websocket::run(tx, coinbase::WS_URL, coinbase::subscribe, coinbase::handle).await,
         }
     });
 
-    // connect to the websocket and start sending messages to the persister
-    let mut stream = websocket::connect(&config.ws_url).await?;
-    stream.send(coinbase::subscribe()).await?;
-
-    while let Some(message) = stream.next().await {
-        match message {
-            Ok(message) => tx.send(coinbase::handle(message)).await?,
-            Err(e) => {
-                error!("Websocket error: {:?}", e);
-                break;
-            }
-        }
-    }
-
-    // housekeeping
-    drop(tx);
-    persister.await?;
+    join_all(vec![persister, websocket]).await;
 
     Ok(())
 }
 
-pub enum Record {
-    Data {
-        exchange: String,
-        channel: String,
-        symbol: String,
-        data: String,
-    },
-    Skip,
+mod config {
+    use clap::{Parser, ValueEnum};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::EnvFilter;
+
+    #[derive(Debug, Clone, PartialEq, ValueEnum)]
+    pub enum Venue {
+        Coinbase,
+    }
+
+    #[derive(Debug, Parser)]
+    #[clap(author, version, about, long_about = None)]
+    pub struct Args {
+        #[clap(short, long, value_enum)]
+        pub venue: Venue,
+    }
+
+    pub fn init() -> Args {
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_line_number(true))
+            .with(EnvFilter::from_default_env())
+            .init();
+
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        Args::parse()
+    }
 }
 
-mod websocket {
-    use anyhow::Result;
-    use tokio::net::TcpStream;
-    use tokio_tungstenite::{connect_async, tungstenite::client::IntoClientRequest, MaybeTlsStream, WebSocketStream};
+mod model {
+    use crate::coinbase::RfqMatch;
 
-    pub async fn connect(ws_url: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        let request = ws_url.into_client_request()?;
-        let (stream, _) = connect_async(request).await?;
-        Ok(stream)
+    pub enum VenueData {
+        CoinbaseRfqMatch(RfqMatch),
+    }
+
+    pub enum Record {
+        Data {
+            exchange: String,
+            channel: String,
+            symbol: String,
+            data: VenueData,
+        },
+        Skip,
     }
 }
 
 mod persister {
-    use anyhow::Result;
     use tokio::sync::mpsc::Receiver;
+    use tracing::info;
 
-    use crate::Record;
+    use crate::model::Record;
 
-    pub async fn handle(rx: Receiver<Record>) -> Result<()> {
-        todo!()
+    pub async fn run(mut rx: Receiver<Record>) {
+        while let Some(_record) = rx.recv().await {
+            info!("received data");
+        }
+    }
+}
+
+mod websocket {
+    use anyhow::Result;
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpStream;
+    use tokio::sync::mpsc::Sender;
+    use tokio_tungstenite::{
+        connect_async_tls_with_config,
+        tungstenite::{client::IntoClientRequest, Message},
+        MaybeTlsStream, WebSocketStream,
+    };
+    use tracing::error;
+
+    use crate::model::Record;
+
+    pub async fn run(
+        tx: Sender<Record>,
+        ws_url: &str,
+        subscribe_fn: impl Fn() -> Message,
+        handle_fn: impl Fn(Message) -> Record,
+    ) {
+        let mut stream = match connect(ws_url).await {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Websocket connect error: {:?}", e);
+                return;
+            }
+        };
+
+        if let Err(e) = stream.send(subscribe_fn()).await {
+            error!("Websocket send error: {:?}", e);
+            return;
+        }
+
+        while let Some(message) = stream.next().await {
+            match message {
+                Ok(message) => {
+                    let record = handle_fn(message);
+                    if let Err(e) = tx.send(record).await {
+                        error!("Channel send error: {:?}", e);
+                        return;
+                    }
+                }
+                Err(e) => {
+                    error!("Websocket error: {:?}", e);
+                    break;
+                }
+            }
+        }
+    }
+
+    async fn connect(ws_url: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+        let request = ws_url.into_client_request()?;
+        let (stream, _) = connect_async_tls_with_config(request, None, true, None).await?;
+        Ok(stream)
     }
 }
 
 mod coinbase {
-    // use serde::Deserialize;
-    use serde_json::{from_str, json, Value};
+    use parquet_derive::ParquetRecordWriter;
+    use serde::Deserialize;
+    use serde_json::{from_str, json};
     use tokio_tungstenite::tungstenite::Message;
 
-    use crate::{util::field, Record};
+    use crate::model::{Record, VenueData};
 
-    const EXCHANGE: &str = "coinbase";
+    pub const EXCHANGE: &str = "coinbase";
+    pub const WS_URL: &str = "wss://ws-feed.exchange.coinbase.com";
 
     pub fn subscribe() -> Message {
         let subscription = json!({
@@ -104,12 +169,12 @@ mod coinbase {
 
     pub fn handle(message: Message) -> Record {
         match message {
-            Message::Text(string) => match from_str::<Value>(&string) {
-                Ok(value) => Record::Data {
+            Message::Text(string) => match from_str::<RfqMatch>(&string) {
+                Ok(rfq_match) if rfq_match.channel == "rfq_match" => Record::Data {
                     exchange: EXCHANGE.to_string(),
-                    channel: field(&value, "type"),
-                    symbol: field(&value, "product_id"),
-                    data: string,
+                    channel: rfq_match.channel.clone(),
+                    symbol: rfq_match.product_id.clone(),
+                    data: VenueData::CoinbaseRfqMatch(rfq_match),
                 },
                 _ => Record::Skip,
             },
@@ -117,26 +182,17 @@ mod coinbase {
         }
     }
 
-    // #[derive(ParquetRecordWriter, Deserialize, Debug)]
-    // pub struct RfqMatch {
-    //     #[serde(rename = "type")]
-    //     pub channel: String,
-    //     pub maker_order_id: String,
-    //     pub taker_order_id: String,
-    //     pub time: String,
-    //     pub trade_id: u64,
-    //     pub product_id: String,
-    //     pub size: f64,
-    //     pub price: f64,
-    //     pub side: String,
-    // }
-}
-
-mod util {
-    use serde_json::Value;
-
-    #[inline]
-    pub fn field(value: &Value, key: &str) -> String {
-        value[key].as_str().unwrap_or_default().to_owned()
+    #[derive(Deserialize, Debug, ParquetRecordWriter)]
+    pub struct RfqMatch {
+        #[serde(rename = "type")]
+        pub channel: String,
+        pub maker_order_id: String,
+        pub taker_order_id: String,
+        pub time: String,
+        pub trade_id: u64,
+        pub product_id: String,
+        pub size: f64,
+        pub price: f64,
+        pub side: String,
     }
 }

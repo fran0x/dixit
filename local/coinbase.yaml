@@ -1,3 +1,0 @@
-exchange: 'coinbase'
-ws_url: 'wss://ws-feed.exchange.coinbase.com'
-channels: ['rfq_matches']

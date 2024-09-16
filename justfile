@@ -33,4 +33,4 @@ release:
 
 # launch coinbase
 run-coinbase:
-    cargo run -- -c local/coinbase.yaml
+    RUST_LOG=info cargo run -- -v coinbase
