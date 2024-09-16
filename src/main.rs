@@ -72,7 +72,7 @@ mod model {
             exchange: String,
             channel: String,
             symbol: String,
-            data: VenueData,
+            data: Box<VenueData>,
         },
         Skip,
     }
@@ -82,11 +82,19 @@ mod persister {
     use tokio::sync::mpsc::Receiver;
     use tracing::info;
 
-    use crate::model::Record;
+    use crate::model::{Record, VenueData};
 
     pub async fn run(mut rx: Receiver<Record>) {
-        while let Some(_record) = rx.recv().await {
+        while let Some(record) = rx.recv().await {
             info!("received data");
+            match record {
+                Record::Data { data, .. } => match *data {
+                    VenueData::CoinbaseRfqMatch(_rfq_match) => {
+                        info!("received coinbase data");
+                    }
+                },
+                Record::Skip => {}
+            }
         }
     }
 }
@@ -149,7 +157,8 @@ mod websocket {
 }
 
 mod coinbase {
-    use parquet_derive::ParquetRecordWriter;
+    use chrono::{DateTime, Utc};
+    use rust_decimal::Decimal;
     use serde::Deserialize;
     use serde_json::{from_str, json};
     use tokio_tungstenite::tungstenite::Message;
@@ -174,7 +183,7 @@ mod coinbase {
                     exchange: EXCHANGE.to_string(),
                     channel: rfq_match.channel.clone(),
                     symbol: rfq_match.product_id.clone(),
-                    data: VenueData::CoinbaseRfqMatch(rfq_match),
+                    data: Box::new(VenueData::CoinbaseRfqMatch(rfq_match)),
                 },
                 _ => Record::Skip,
             },
@@ -182,17 +191,17 @@ mod coinbase {
         }
     }
 
-    #[derive(Deserialize, Debug, ParquetRecordWriter)]
+    #[derive(Deserialize, Debug)]
     pub struct RfqMatch {
         #[serde(rename = "type")]
         pub channel: String,
         pub maker_order_id: String,
         pub taker_order_id: String,
-        pub time: String,
+        pub time: DateTime<Utc>,
         pub trade_id: u64,
         pub product_id: String,
-        pub size: f64,
-        pub price: f64,
+        pub size: Decimal,
+        pub price: Decimal,
         pub side: String,
     }
 }
