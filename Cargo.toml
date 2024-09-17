@@ -1,13 +1,22 @@
-[package]
-name = "recorder-rs"
-version = "0.1.0"
+[workspace.package]
+version = "0.0.0"
 edition = "2021"
 
-[dependencies]
+[workspace]
+members = [
+    "recorder_bin",
+    "recorder_persist",
+]
+resolver = "2"
+
+[workspace.dependencies]
 anyhow = "1.0.89"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.17", features = ["derive"] }
+compact_str = { version = "0.8.0", features = ["serde"] }
 futures = "0.3.30"
+itertools = "0.13.0"
+parquet = { version = "53.0.0", features = ["zstd"] }
 rust_decimal = { version = "1.36.0", features = ["serde"] }
 rustls = "0.23.13"
 serde = { version = "1.0.210", features = ["derive"] }
