@@ -1,7 +1,12 @@
 [package]
-name = "recorder_bin"
-version = "0.1.0"
-edition = "2021"
+name = "record_bin"
+description = "record(er) binary"
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
