@@ -9,6 +9,8 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+record_persist_derive.workspace = true
+
 anyhow.workspace = true
 chrono.workspace = true
 compact_str.workspace = true
@@ -17,3 +19,6 @@ parquet.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+rand.workspace = true

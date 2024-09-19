@@ -16,6 +16,9 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+record_persist = { path = "record_persist" }
+record_persist_derive = { path = "record_persist_derive" }
+
 anyhow = "1.0.89"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.17", features = ["derive"] }
@@ -23,6 +26,7 @@ compact_str = { version = "0.8.0", features = ["serde"] }
 futures = "0.3.30"
 itertools = "0.13.0"
 parquet = { version = "53.0.0", features = ["zstd"] }
+rand = "0.8.5" # used for tests
 rust_decimal = { version = "1.36.0", features = ["serde"] }
 rustls = "0.23.13"
 serde = { version = "1.0.210", features = ["derive"] }

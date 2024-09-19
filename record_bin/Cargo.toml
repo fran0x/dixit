@@ -9,10 +9,14 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+record_persist.workspace = true
+record_persist_derive.workspace = true
+
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
 futures.workspace = true
+parquet.workspace = true
 rust_decimal.workspace = true
 rustls.workspace = true
 serde.workspace = true

@@ -28,64 +28,6 @@ pub struct TableWriter {
     pub auto_flush: bool,
 }
 
-impl Drop for TableWriter {
-    fn drop(&mut self) {
-        if !self.buffer.is_empty() {
-            if let Err(e) = self.flush() {
-                error!("failed to flush file {:?}", e)
-            }
-        }
-    }
-}
-
-pub struct RowBuilder<'a> {
-    writer: &'a mut TableWriter,
-}
-
-impl<'a> RowBuilder<'a> {
-    pub fn new(writer: &'a mut TableWriter) -> Self {
-        Self { writer }
-    }
-
-    pub fn record<T: Persistable>(self, record: &T) -> Result<Self, PersistError> {
-        if self.writer.enabled {
-            if self.writer.schema.is_none() {
-                T::schema(&mut self.writer.fields, None, None, None);
-            }
-
-            record.append(&mut self.writer.buffer)?;
-        }
-        Ok(self)
-    }
-
-    pub fn end(&mut self) -> Result<(), PersistError> {
-        if self.writer.enabled {
-            if self.writer.schema.is_none() {
-                info!(
-                    "created table {:?} {:?}",
-                    self.writer.current_file_path,
-                    self.writer
-                        .fields
-                        .iter()
-                        .map(|f| format!("{}:{:?}", f.name(), f.get_physical_type()))
-                        .collect_vec()
-                );
-
-                self.writer.schema.replace(Arc::new(
-                    Type::group_type_builder("schema")
-                        .with_fields(self.writer.fields.clone())
-                        .build()?,
-                ));
-            }
-
-            if self.writer.auto_flush {
-                self.writer.flush_if_needed()?;
-            }
-        }
-        Ok(())
-    }
-}
-
 impl TableWriter {
     pub fn new(path_prefix: &str, persist_config: &PersistConfig) -> Result<Self> {
         let enabled = (persist_config.tables.is_empty() || persist_config.tables.contains(path_prefix))
@@ -179,6 +121,64 @@ impl TableWriter {
     pub fn flush_if_needed(&mut self) -> Result<(), PersistError> {
         if self.buffer.len() >= self.flush_size {
             self.flush()?
+        }
+        Ok(())
+    }
+}
+
+impl Drop for TableWriter {
+    fn drop(&mut self) {
+        if !self.buffer.is_empty() {
+            if let Err(e) = self.flush() {
+                error!("failed to flush file {:?}", e)
+            }
+        }
+    }
+}
+
+pub struct RowBuilder<'a> {
+    writer: &'a mut TableWriter,
+}
+
+impl<'a> RowBuilder<'a> {
+    pub fn new(writer: &'a mut TableWriter) -> Self {
+        Self { writer }
+    }
+
+    pub fn record<T: Persistable>(self, record: &T) -> Result<Self, PersistError> {
+        if self.writer.enabled {
+            if self.writer.schema.is_none() {
+                T::schema(&mut self.writer.fields, None, None, None);
+            }
+
+            record.append(&mut self.writer.buffer)?;
+        }
+        Ok(self)
+    }
+
+    pub fn end(&mut self) -> Result<(), PersistError> {
+        if self.writer.enabled {
+            if self.writer.schema.is_none() {
+                info!(
+                    "created table {:?} {:?}",
+                    self.writer.current_file_path,
+                    self.writer
+                        .fields
+                        .iter()
+                        .map(|f| format!("{}:{:?}", f.name(), f.get_physical_type()))
+                        .collect_vec()
+                );
+
+                self.writer.schema.replace(Arc::new(
+                    Type::group_type_builder("schema")
+                        .with_fields(self.writer.fields.clone())
+                        .build()?,
+                ));
+            }
+
+            if self.writer.auto_flush {
+                self.writer.flush_if_needed()?;
+            }
         }
         Ok(())
     }

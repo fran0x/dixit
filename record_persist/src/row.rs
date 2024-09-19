@@ -5,8 +5,7 @@ use parquet::file::writer::SerializedFileWriter;
 use parquet::record::Field;
 use std::io::Write;
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RowBuffer {
     rows: Vec<Vec<Field>>,
     current_col: usize,
@@ -18,7 +17,6 @@ pub struct RowBuffer {
     f64s: Vec<f64>,
     strs: Vec<ByteArray>,
 }
-
 
 impl RowBuffer {
     pub fn begin(&mut self) {
