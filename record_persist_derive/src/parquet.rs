@@ -7,7 +7,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Lit, Meta, Ne
 
 /// A procedural macro that implements the `Persistable` trait for a given struct or enum.
 ///
-/// This macro generates the `schema` and `append_to_row` methods, which are used to persist
+/// This macro generates the `schema` and `append` methods, which are used to persist
 /// data structures into Parquet format.
 pub fn persist_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -17,19 +17,19 @@ pub fn persist_derive(input: TokenStream) -> TokenStream {
     let append_body = generate_append_body(&input.data, name);
 
     let expanded = quote! {
-        impl persist::Persistable for #name {
+        impl record_persist::Persistable for #name {
 
             fn schema(fields: &mut Vec<parquet::schema::types::TypePtr>, prefix: core::option::Option<&str>, repetition_override: Option<parquet::basic::Repetition>, logical_type: Option<parquet::basic::LogicalType>) {
-                use persist::row::*;
-                use persist::*;
+                use record_persist::row::*;
+                use record_persist::*;
                 use parquet::basic::Type as PhysicalType;
 
                 #schema_body
             }
 
-            fn append(&self, row: &mut persist::row::RowBuffer) -> anyhow::Result<(), ::parquet::errors::ParquetError> {
-                use persist::row::*;
-                use persist::*;
+            fn append(&self, row: &mut record_persist::row::RowBuffer) -> anyhow::Result<(), ::parquet::errors::ParquetError> {
+                use record_persist::row::*;
+                use record_persist::*;
                 use parquet::basic::Type as PhysicalType;
 
                 #append_body
@@ -170,7 +170,7 @@ fn generate_append_body(data: &Data, name: &syn::Ident) -> proc_macro2::TokenStr
                         None
                     } else {
                         Some(quote! {
-                            self.#field_name.append_to_row(row)?;
+                            self.#field_name.append(row)?;
                         })
                     }
                 });
@@ -183,7 +183,7 @@ fn generate_append_body(data: &Data, name: &syn::Ident) -> proc_macro2::TokenStr
                 let field_appends = fields.unnamed.iter().enumerate().map(|(i, _)| {
                     let index = syn::Index::from(i);
                     Some(quote! {
-                        self.#index.append_to_row(row)?;
+                        self.#index.append(row)?;
                     })
                 });
 
