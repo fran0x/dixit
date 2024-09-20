@@ -16,6 +16,7 @@ chrono.workspace = true
 compact_str.workspace = true
 itertools.workspace = true
 parquet.workspace = true
+rust_decimal.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

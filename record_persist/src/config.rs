@@ -14,6 +14,19 @@ pub struct PersistConfig {
     pub tables: HashSet<String>,
 }
 
+impl PersistConfig {
+    pub fn new(directory: &str, table: &str) -> Self {
+        let mut tables = HashSet::new();
+        tables.insert(table.to_owned());
+
+        Self {
+            directory: directory.to_owned(),
+            keep: false,
+            tables,
+        }
+    }
+}
+
 impl fmt::Display for PersistConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

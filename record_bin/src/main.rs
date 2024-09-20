@@ -1,6 +1,7 @@
 use anyhow::Result;
 use futures::future::join_all;
 use tokio::sync::mpsc;
+use tracing::error;
 
 use config::{init, Venue};
 use model::Record;
@@ -15,13 +16,17 @@ async fn main() -> Result<()> {
 
     // launch the persister
     let persister = tokio::spawn(async move {
-        persister::run(rx).await;
+        if let Err(e) = persister::run(args.venue, rx).await {
+            error!("persisted error: {e}");
+        }
     });
 
     // launch the websocket
     let websocket = tokio::spawn(async move {
-        match args.venue {
+        if let Err(e) = match args.venue {
             Venue::Coinbase => websocket::run(tx, coinbase::WS_URL, coinbase::subscribe, coinbase::handle).await,
+        } {
+            error!("websocket error: {e}");
         }
     });
 
@@ -31,17 +36,28 @@ async fn main() -> Result<()> {
 }
 
 mod config {
+    use std::fmt;
+
     use clap::{Parser, ValueEnum};
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_subscriber::EnvFilter;
 
-    #[derive(Debug, Clone, PartialEq, ValueEnum)]
+    #[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
     pub enum Venue {
         Coinbase,
     }
 
-    #[derive(Debug, Parser)]
+    impl fmt::Display for Venue {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let status_str = match self {
+                Venue::Coinbase => "coinbase",
+            };
+            write!(f, "{}", status_str)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Parser)]
     #[clap(author, version, about, long_about = None)]
     pub struct Args {
         #[clap(short, long, value_enum)]
@@ -85,18 +101,40 @@ mod model {
 }
 
 mod persister {
+    use std::{env, sync::LazyLock};
+
+    use anyhow::{Ok, Result};
+    use record_persist::{config::PersistConfig, writer::TableWriter};
     use tokio::sync::mpsc::Receiver;
     use tracing::{error, info};
 
-    use crate::model::{Record, VenueData};
+    use crate::{
+        config::Venue,
+        model::{Record, VenueData},
+    };
 
-    pub async fn run(mut rx: Receiver<Record>) {
+    static OUTPUT_FOLDER: LazyLock<String> = LazyLock::new(|| {
+        let mut path_buf = env::current_dir().unwrap();
+        path_buf.push("output");
+        path_buf.into_os_string().into_string().expect("invalid path")
+    });
+
+    pub async fn run(venue: Venue, mut rx: Receiver<Record>) -> Result<()> {
+        let config = PersistConfig::new(&OUTPUT_FOLDER, &venue.to_string());
+        let mut writer = TableWriter::new(&venue.to_string(), &config)?;
+
         while let Some(record) = rx.recv().await {
             match record {
                 Record::Data {
-                    data: VenueData::CoinbaseRfqMatch(_),
-                    ..
-                } => info!("coinbase data"),
+                    data: VenueData::CoinbaseRfqMatch(rfq_match),
+                    exchange,
+                    channel,
+                    symbol,
+                } => {
+                    info!("[{exchange}] [{channel}] [{symbol}]: {:?}", rfq_match);
+                    writer.begin()?.record(&rfq_match)?.end()?;
+                    writer.flush_if_needed()?;
+                }
                 Record::Skip { message } => info!("skip data: {message}"),
                 Record::Error { message, reason } => {
                     error!("{message}: {reason}");
@@ -104,11 +142,14 @@ mod persister {
                 }
             }
         }
+
+        writer.flush()?;
+        Ok(())
     }
 }
 
 mod websocket {
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
     use futures::{SinkExt, StreamExt};
     use tokio::net::TcpStream;
     use tokio::sync::mpsc::Sender;
@@ -117,7 +158,6 @@ mod websocket {
         tungstenite::{client::IntoClientRequest, Message},
         MaybeTlsStream, WebSocketStream,
     };
-    use tracing::error;
 
     use crate::model::Record;
 
@@ -126,35 +166,22 @@ mod websocket {
         ws_url: &str,
         subscribe_fn: impl Fn() -> Message,
         handle_fn: impl Fn(Message) -> Record,
-    ) {
-        let mut stream = match connect(ws_url).await {
-            Ok(s) => s,
-            Err(e) => {
-                error!("websocket connect error: {:?}", e);
-                return;
-            }
-        };
+    ) -> Result<()> {
+        let mut stream = connect(ws_url).await?;
 
-        if let Err(e) = stream.send(subscribe_fn()).await {
-            error!("websocket send error: {:?}", e);
-            return;
-        }
+        stream.send(subscribe_fn()).await?;
 
         while let Some(message) = stream.next().await {
             match message {
                 Ok(message) => {
                     let record = handle_fn(message);
-                    if let Err(e) = tx.send(record).await {
-                        error!("channel send error: {:?}", e);
-                        return;
-                    }
+                    tx.send(record).await?;
                 }
-                Err(e) => {
-                    error!("websocket error: {:?}", e);
-                    break;
-                }
+                Err(e) => return Err(anyhow!(e)),
             }
         }
+
+        Ok(())
     }
 
     async fn connect(ws_url: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
@@ -166,6 +193,7 @@ mod websocket {
 
 mod coinbase {
     use chrono::{DateTime, Utc};
+    use record_persist_derive::Persist;
     use rust_decimal::Decimal;
     use serde::Deserialize;
     use serde_json::{from_str, json};
@@ -212,7 +240,7 @@ mod coinbase {
         }
     }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Persist)]
     pub struct RfqMatch {
         #[serde(rename = "type")]
         pub channel: String,

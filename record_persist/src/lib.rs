@@ -6,12 +6,14 @@ pub mod writer;
 use crate::row::RowBuffer;
 
 use chrono::{DateTime, TimeZone};
+use compact_str::CompactString;
 use parquet::basic::Type as PhysicalType;
 use parquet::basic::{LogicalType, Repetition, TimeUnit};
 use parquet::errors::ParquetError;
 use parquet::format::NanoSeconds;
 use parquet::record::Field;
 use parquet::schema::types::{Type, TypePtr};
+use rust_decimal::prelude::ToPrimitive;
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -73,31 +75,6 @@ impl Persistable for String {
     #[inline]
     fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
         row.push(parquet::record::Field::Str(self.clone()));
-        Ok(())
-    }
-}
-
-impl Persistable for compact_str::CompactString {
-    fn schema(
-        fields: &mut Vec<TypePtr>,
-        prefix: Option<&str>,
-        repetition_override: Option<Repetition>,
-        _logical_type: Option<LogicalType>,
-    ) {
-        let prefix = prefix.expect("name must be set");
-        fields.push(
-            Type::primitive_type_builder(prefix, PhysicalType::BYTE_ARRAY)
-                .with_repetition(repetition_override.unwrap_or(Repetition::REQUIRED))
-                .with_logical_type(Some(LogicalType::String))
-                .build()
-                .unwrap()
-                .into(),
-        );
-    }
-
-    #[inline]
-    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
-        row.push(parquet::record::Field::Str(self.to_string()));
         Ok(())
     }
 }
@@ -403,3 +380,54 @@ impl_persistable_for_arrays!(
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
     32
 );
+
+impl Persistable for CompactString {
+    fn schema(
+        fields: &mut Vec<TypePtr>,
+        prefix: Option<&str>,
+        repetition_override: Option<Repetition>,
+        _logical_type: Option<LogicalType>,
+    ) {
+        let prefix = prefix.expect("name must be set");
+        fields.push(
+            Type::primitive_type_builder(prefix, PhysicalType::BYTE_ARRAY)
+                .with_repetition(repetition_override.unwrap_or(Repetition::REQUIRED))
+                .with_logical_type(Some(LogicalType::String))
+                .build()
+                .unwrap()
+                .into(),
+        );
+    }
+
+    #[inline]
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
+        row.push(parquet::record::Field::Str(self.to_string()));
+        Ok(())
+    }
+}
+
+impl Persistable for rust_decimal::Decimal {
+    fn schema(
+        fields: &mut Vec<TypePtr>,
+        prefix: Option<&str>,
+        repetition_override: Option<Repetition>,
+        _logical_type: Option<LogicalType>,
+    ) {
+        // PhysicalType::DOUBLE, parquet::record::Field::Double);
+        let prefix = prefix.expect("name must be set");
+        fields.push(
+            Type::primitive_type_builder(prefix, PhysicalType::DOUBLE)
+                .with_repetition(repetition_override.unwrap_or(Repetition::REQUIRED))
+                .with_logical_type(Some(LogicalType::String))
+                .build()
+                .unwrap()
+                .into(),
+        );
+    }
+
+    #[inline]
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
+        row.push(parquet::record::Field::Double(self.to_f64().unwrap()));
+        Ok(())
+    }
+}
