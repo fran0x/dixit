@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-const BUFFERED_ROWS: usize = 1_000_000;
+const BUFFERED_ROWS: usize = 100;
 
 pub struct TableWriter {
     flush_size: usize,

@@ -411,14 +411,14 @@ impl Persistable for rust_decimal::Decimal {
         fields: &mut Vec<TypePtr>,
         prefix: Option<&str>,
         repetition_override: Option<Repetition>,
-        _logical_type: Option<LogicalType>,
+        logical_type: Option<LogicalType>,
     ) {
         // PhysicalType::DOUBLE, parquet::record::Field::Double);
         let prefix = prefix.expect("name must be set");
         fields.push(
             Type::primitive_type_builder(prefix, PhysicalType::DOUBLE)
                 .with_repetition(repetition_override.unwrap_or(Repetition::REQUIRED))
-                .with_logical_type(Some(LogicalType::String))
+                .with_logical_type(logical_type)
                 .build()
                 .unwrap()
                 .into(),
