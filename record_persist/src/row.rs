@@ -8,7 +8,7 @@ use std::io::Write;
 #[derive(Debug, Default)]
 pub struct RowBuffer {
     rows: Vec<Vec<Field>>,
-    current_col: usize,
+    current: usize,
     not_null: Vec<i16>,
     bools: Vec<bool>,
     i32s: Vec<i32>,
@@ -20,24 +20,24 @@ pub struct RowBuffer {
 
 impl RowBuffer {
     pub fn begin(&mut self) {
-        debug_assert_eq!(self.current_col, self.rows.len());
-        self.current_col = 0;
+        debug_assert_eq!(self.current, self.rows.len());
+        self.current = 0;
     }
 
-    pub fn push(&mut self, val: Field) {
-        if self.rows.len() <= self.current_col {
-            self.rows.resize_with(self.current_col + 1, Vec::new);
+    pub fn push(&mut self, field: Field) {
+        if self.rows.len() <= self.current {
+            self.rows.resize_with(self.current + 1, Vec::new);
         }
-        self.rows[self.current_col].push(val);
-        self.current_col += 1;
+        self.rows[self.current].push(field);
+        self.current += 1;
     }
 
     pub fn record<W: Write + Send>(&mut self, writer: &mut SerializedFileWriter<W>) -> Result<usize, ParquetError> {
         debug_assert_eq!(
-            self.current_col,
+            self.current,
             self.rows.len(),
             "current {} actual {}",
-            self.current_col,
+            self.current,
             self.rows.len()
         );
         debug_assert_eq!(1, self.rows.iter().map(|c| c.len()).sorted().dedup().count());
@@ -50,16 +50,16 @@ impl RowBuffer {
         let mut row_group_writer = writer.next_row_group()?;
         let not_null = &mut self.not_null;
 
-        for col in self.rows.iter_mut() {
+        for column in self.rows.iter_mut() {
             let mut column_writer = row_group_writer.next_column()?.unwrap();
 
             not_null.clear();
-            not_null.extend(col.iter().map(|f| if matches!(f, Field::Null) { 0 } else { 1 }));
+            not_null.extend(column.iter().map(|f| if matches!(f, Field::Null) { 0 } else { 1 }));
 
             match column_writer.untyped() {
                 parquet::column::writer::ColumnWriter::BoolColumnWriter(ref mut typed_writer) => {
                     self.bools.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Bool(val) => self.bools.push(*val),
                             Field::Null => (),
@@ -70,7 +70,7 @@ impl RowBuffer {
                 }
                 parquet::column::writer::ColumnWriter::Int32ColumnWriter(ref mut typed_writer) => {
                     self.i32s.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Int(val) => self.i32s.push(*val),
                             Field::UInt(val) => self.i32s.push(*val as i32),
@@ -82,7 +82,7 @@ impl RowBuffer {
                 }
                 parquet::column::writer::ColumnWriter::Int64ColumnWriter(ref mut typed_writer) => {
                     self.i64s.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Long(val) => self.i64s.push(*val),
                             Field::ULong(val) => self.i64s.push(*val as i64),
@@ -94,7 +94,7 @@ impl RowBuffer {
                 }
                 parquet::column::writer::ColumnWriter::FloatColumnWriter(ref mut typed_writer) => {
                     self.f32s.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Float(val) => self.f32s.push(*val),
                             Field::Null => (),
@@ -105,7 +105,7 @@ impl RowBuffer {
                 }
                 parquet::column::writer::ColumnWriter::DoubleColumnWriter(ref mut typed_writer) => {
                     self.f64s.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Double(val) => self.f64s.push(*val),
                             Field::Null => (),
@@ -121,7 +121,7 @@ impl RowBuffer {
                 }
                 parquet::column::writer::ColumnWriter::ByteArrayColumnWriter(ref mut typed_writer) => {
                     self.strs.clear();
-                    for f in col.iter() {
+                    for f in column.iter() {
                         match f {
                             Field::Str(ref val) => self.strs.push(ByteArray::from(val.as_str())),
                             Field::Null => (),
@@ -138,7 +138,7 @@ impl RowBuffer {
                 _ => return Err(ParquetError::General("unsupported column writer type".to_string())),
             }
             column_writer.close()?;
-            col.clear();
+            column.clear();
         }
         row_group_writer.close()?;
         Ok(size)

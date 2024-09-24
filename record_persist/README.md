@@ -1,6 +1,6 @@
 # Persist Crates
 
-This project includes two utility crates for handling Parquet persistence:
+This project includes two crates for handling Parquet persistence:
 
 1. **`record_persist`**: Implements the logic for persisting structs in Parquet files.
 2. **`persist_derive`**: Provides a procedural macro to simplify struct persistence.
@@ -21,3 +21,5 @@ pub struct OrderBook {
 ```
 
 For more details refer to the test file [`writer.rs`](tests/writer.rs).
+
+⚠️ **Warning**: These crates are work in progress, subject to breaking changes.

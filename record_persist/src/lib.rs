@@ -29,7 +29,7 @@ pub trait Persistable {
         logical_type: Option<LogicalType>,
     );
 
-    fn append(&self, rows: &mut RowBuffer) -> Result<(), ParquetError>;
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError>;
 
     fn field_count() -> usize
     where
@@ -146,8 +146,8 @@ impl<T: Persistable + Debug> Persistable for Vec<T> {
     }
 
     #[inline]
-    fn append(&self, rows: &mut RowBuffer) -> Result<(), ParquetError> {
-        rows.push(Field::Str(format!("{:?}", self)));
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
+        row.push(Field::Str(format!("{:?}", self)));
         Ok(())
     }
 }
@@ -171,8 +171,8 @@ impl<T: Persistable + Debug> Persistable for HashSet<T> {
     }
 
     #[inline]
-    fn append(&self, rows: &mut RowBuffer) -> Result<(), ParquetError> {
-        rows.push(Field::Str(format!("{:?}", self)));
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
+        row.push(Field::Str(format!("{:?}", self)));
         Ok(())
     }
 }
@@ -196,8 +196,8 @@ impl<K: Persistable + Debug, V: Persistable + Debug> Persistable for HashMap<K, 
     }
 
     #[inline]
-    fn append(&self, rows: &mut RowBuffer) -> Result<(), ParquetError> {
-        rows.push(Field::Str(format!("{:?}", self)));
+    fn append(&self, row: &mut RowBuffer) -> Result<(), ParquetError> {
+        row.push(Field::Str(format!("{:?}", self)));
         Ok(())
     }
 }
