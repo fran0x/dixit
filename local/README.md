@@ -2,10 +2,10 @@
 
 This project contains two Jupyter notebooks:
 
-1. **[Order Book](orderbook.ipynb)**: This notebook is used to plot an order book persisted in Parquet format as a test for the `persist_derive` crate.
-2. **[Coinbase RFQs](coinbase.ipynb)**: This notebook plots RFQs from Coinbase.
+1. **[orderbook](orderbook.ipynb)**: This notebook is used to plot an order book persisted in Parquet format as a test for the `persist_derive` crate.
+2. **[coinbase](coinbase.ipynb)**: This notebook plots RFQs from Coinbase.
 
-### Step by Step
+## Step by Step
 
 ```bash
 # Install prerequisites via Homebrew
@@ -22,7 +22,7 @@ poetry install
 # Use VSCode to select the virtual environment and run the notebook (see below)
 ```
 
-### Open the Jupyter Notebook in VSCode
+## Open the Jupyter Notebook in VSCode
 
 1. Open the project folder in **VSCode**.
 2. Use the command palette (`Ctrl + Shift + P` or `Cmd + Shift + P` on macOS) to select the Python interpreter.
