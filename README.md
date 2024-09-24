@@ -19,3 +19,27 @@ Run `just` in the command line to list available commands.
 ## Data Analysis
 
 Analyze the data using Jupyter notebooks in the [local](local) directory. More details in [local/README.md](local/README.md).
+
+## Persist
+
+This project includes two utility crates:
+
+1. `record_persist`: Contains the logic to persist a struct in Parquet files.
+2. `persist_derive`: Provides a procedural macro to simplify the process of persisting structs.
+
+Here's an example:
+
+```rust
+use record_persist_derive::Persist;
+
+#[derive(Debug, Clone, Persist)]
+pub struct OrderBook {
+    pub exchange_id: u32,
+    pub symbol_id: u32,
+    // other fields...
+    pub exchange_ts: u64,
+    pub internal_ts: u64,
+}
+```
+
+To learn more about how to use these crates, check the test [`writer.rs`](record_persist/tests/writer.rs).

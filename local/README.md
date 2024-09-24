@@ -1,5 +1,3 @@
-### Step by Step
-
 # Project Overview
 
 This project contains two Jupyter notebooks:
