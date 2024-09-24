@@ -22,4 +22,6 @@ pub struct OrderBook {
 
 For more details refer to the test file [`writer.rs`](tests/writer.rs).
 
+---
+
 ⚠️ **Warning**: These crates are work in progress, subject to breaking changes.
