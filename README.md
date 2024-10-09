@@ -1,7 +1,3 @@
-Here’s an improved version of your README:
-
----
-
 [![Build Badge]][build] [![License Badge]][license]
 
 [Build Badge]: https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Ffran0x%record0x%2Fbadge%3Fref%3Dmain&style=flat&label=build  
@@ -34,3 +30,7 @@ Run `just` in the command line to view available commands.
 3. Go to the [local](local) folder and follow the instructions in the corresponding [README](local/README.md) to launch a notebook for analyzing Coinbase data.
 
 _Note: The default notebook reads sample data from the `local` folder but can easily be configured to read from the `output` folder._
+
+## Next Steps
+
+To extend the project and support other venues just replicate the approach used in [record_bin::main::coinbase](record_bin/src/main.rs).

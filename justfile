@@ -33,4 +33,4 @@ release:
 
 # launch coinbase
 coinbase:
-    RUST_LOG=info cargo run -- -v coinbase
+    @RUST_LOG=info cargo run -- -v coinbase
