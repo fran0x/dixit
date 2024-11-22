@@ -1,15 +1,16 @@
 [package]
 name = "dixit_persist"
 description = "dixit persist library"
-version.workspace = true
+version = "1.0.0"
 edition.workspace = true
 keywords.workspace = true
 repository.workspace = true
 authors.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
-dixit_persist_macros.workspace = true
+dixit_persist_macros = { path = "../dixit_persist_macros" }
 
 anyhow.workspace = true
 chrono.workspace = true

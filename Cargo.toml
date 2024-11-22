@@ -1,5 +1,4 @@
 [workspace.package]
-version = "0.0.0"
 edition = "2021"
 keywords = ["dixit", "persist"]
 repository = "https://github.com/fran0x/dixit"
@@ -16,9 +15,6 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-dixit_persist = { path = "dixit_persist" }
-dixit_persist_macros = { path = "dixit_persist_macros" }
-
 anyhow = "1.0.89"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.17", features = ["derive"] }

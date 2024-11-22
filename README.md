@@ -1,13 +1,7 @@
-[![Build Badge]][build] [![Crates Badge]][crates] [![Docs Badge]][docs] [![License Badge]][license]
+[![Build Badge]][build] [![License Badge]][license]
 
 [Build Badge]: https://github.com/fran0x/dixit/actions/workflows/rust.yml/badge.svg
 [build]: https://github.com/fran0x/dixit/actions
-
-[Crates Badge]: https://img.shields.io/crates/v/dixit.svg
-[crates]: https://crates.io/crates/dixit
-
-[Docs Badge]: https://docs.rs/dixit/badge.svg
-[docs]: https://docs.rs/dixit
 
 [License Badge]: https://img.shields.io/badge/License-MIT-blue.svg  
 [license]: LICENSE
